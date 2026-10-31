@@ -57,14 +57,12 @@ export function MovementsView() {
       <section className="card px-4">
         {!data ? <Skeleton className="my-4 h-40" /> : rows.length === 0 ? <p className="py-10 text-center text-muted">{t.noMovements}</p> : (
           <ul className="divide-y divide-line">{rows.map((m) => (
-            <div key={m.id} className="flex items-center gap-2">
-              <div className="min-w-0 flex-1"><MovementRow m={m} /></div>
-              {user.role === "admin" && !m.cancelled && !m.isReversal && (
-                <button type="button" className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-line text-muted hover:border-danger hover:text-danger" onClick={() => setSelected(m)} aria-label={lang === "ar" ? "إلغاء الحركة" : "Cancel movement"} title={lang === "ar" ? "إلغاء الحركة" : "Cancel movement"}>
-                  <Undo2 className="size-5" />
-                </button>
-              )}
-            </div>
+            <MovementRow key={m.id} m={m} action={user.role === "admin" && !m.cancelled && !m.isReversal ? (
+              <button type="button" className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-line text-muted hover:border-danger hover:text-danger"
+                onClick={() => setSelected(m)} aria-label={lang === "ar" ? "إلغاء الحركة" : "Cancel movement"} title={lang === "ar" ? "إلغاء الحركة" : "Cancel movement"}>
+                <Undo2 className="size-5" />
+              </button>
+            ) : null} />
           ))}</ul>
         )}
       </section>
