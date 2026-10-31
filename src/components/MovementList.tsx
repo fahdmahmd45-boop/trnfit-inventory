@@ -1,9 +1,10 @@
 "use client";
 import { ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
 import { useI18n } from "./I18n";
 import type { Movement } from "@/lib/types";
 
-export function MovementRow({ m, showItem = true }: { m: Movement; showItem?: boolean }) {
+export function MovementRow({ m, showItem = true, action }: { m: Movement; showItem?: boolean; action?: ReactNode }) {
   const { t, fmt, fmtDate } = useI18n();
   const Icon = m.type === "in" ? ArrowDownToLine : m.type === "out" ? ArrowUpFromLine : SlidersHorizontal;
   const color = m.type === "in" ? "bg-olive/25 text-olive-light" : m.type === "out" ? "bg-beige/20 text-beige" : "bg-surface-2 text-muted";
@@ -29,6 +30,7 @@ export function MovementRow({ m, showItem = true }: { m: Movement; showItem?: bo
         </div>
         <div className="num text-xs text-muted" dir="ltr">{fmt(m.quantityBefore)} → {fmt(m.quantityAfter)}</div>
       </div>
+      {action}
     </li>
   );
 }
