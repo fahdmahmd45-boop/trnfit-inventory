@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { route, json, parseBody, ApiError, clientIp } from "@/lib/server/http";
-import { requireUser } from "@/lib/server/auth";
-import { getItem, updateVariant } from "@/lib/server/inventory";
+import { requireUser, requireAdmin } from "@/lib/server/auth";
+import { getItem, updateVariant, archiveVariant } from "@/lib/server/inventory";
 import { variantUpdate } from "@/lib/validation";
 import { z } from "zod";
 
@@ -20,4 +20,10 @@ export const PATCH = route<Ctx>(async (req: NextRequest, { params }) => {
   const body = await parseBody(req, variantUpdate);
   const item = await updateVariant(id.parse((await params).id), body, user.id, clientIp(req));
   return json({ item });
+});
+
+export const DELETE = route<Ctx>(async (req: NextRequest, { params }) => {
+  const user = await requireAdmin();
+  const result = await archiveVariant(id.parse((await params).id), user.id, clientIp(req));
+  return json(result);
 });
