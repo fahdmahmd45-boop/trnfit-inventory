@@ -7,6 +7,7 @@ export type Movement = {
   id: number; variantId: string; sku: string; type: "in" | "out" | "adjust";
   quantity: number; quantityBefore: number; quantityAfter: number; note: string | null; reason: string | null;
   employeeName: string; productName: string; variantName: string; createdAt: string;
+  cancelled: boolean; isReversal: boolean;
 };
 export type DashboardStats = {
   products: number; skus: number; units: number; lowStock: number; outOfStock: number;
