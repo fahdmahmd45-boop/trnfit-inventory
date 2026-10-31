@@ -34,6 +34,9 @@ jobs:
                   target = (base / name).resolve()
                   if not target.is_relative_to(base) or name.startswith(".git/") or name == "trnfit-inventory.zip":
                       raise SystemExit(f"Unsafe ZIP entry: {name}")
+                  if name.startswith(".github/workflows/"):
+                      print(f"Skipping workflow file requiring extra permission: {name}")
+                      continue
                   target.parent.mkdir(parents=True, exist_ok=True)
                   with z.open(entry) as source, target.open("wb") as dest:
                       shutil.copyfileobj(source, dest)
