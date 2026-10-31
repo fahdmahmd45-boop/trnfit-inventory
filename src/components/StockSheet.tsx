@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Minus, Plus, X, ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal } from "lucide-react";
 import { useI18n } from "./I18n";
 import { itemTitle, StockBadge } from "./ui";
@@ -16,10 +16,8 @@ export function StockSheet({ item, initialType = "in", onClose, onSubmit, busy }
   const [qty, setQty] = useState<number>(initialType === "adjust" ? item.quantity : 1);
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
-  const confirmRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { setQty(type === "adjust" ? item.quantity : 1); }, [type, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { confirmRef.current?.focus({ preventScroll: true }); }, [item.id]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -101,7 +99,7 @@ export function StockSheet({ item, initialType = "in", onClose, onSubmit, busy }
         </div>
         {after < 0 && <p className="mt-2 text-sm text-danger" role="alert">{t.insufficient}: {fmt(item.quantity)}</p>}
 
-        <button ref={confirmRef} type="submit" disabled={invalid || busy} data-testid="confirm-movement"
+        <button type="submit" disabled={invalid || busy} data-testid="confirm-movement"
           className={`btn mt-4 h-14 w-full text-lg ${type === "out" ? "bg-beige text-brand-black" : type === "in" ? "bg-olive text-offwhite" : "bg-accent text-accent-fg"}`}>
           {t.confirm} {type === "in" ? t.stockIn : type === "out" ? t.stockOut : t.adjust}
           {type !== "adjust" && <span className="num" dir="ltr">({type === "in" ? "+" : "−"}{qty})</span>}
