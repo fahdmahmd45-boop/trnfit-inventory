@@ -3,9 +3,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite from "swr/infinite";
-import { ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal, Pencil, Download, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal, Pencil, Download, Plus, ChevronLeft, ChevronRight, Archive, X } from "lucide-react";
 import { useI18n } from "./I18n";
 import { useToast } from "./Toast";
+import { useUser } from "./Shell";
+import { useRouter } from "next/navigation";
+import { useSWRConfig } from "swr";
 import { StockSheet, type SheetSubmit } from "./StockSheet";
 import { useMovement, type MoveType } from "./useMovement";
 import { MovementRow } from "./MovementList";
@@ -17,6 +20,9 @@ export function ItemDetail({ id }: { id: string }) {
   const { t, lang, fmt, fmtDate } = useI18n();
   const toast = useToast();
   const move = useMovement();
+  const user = useUser();
+  const router = useRouter();
+  const { mutate: mutateGlobal } = useSWRConfig();
   const { data, error, mutate } = useSWR<{ item: Item }>(`/api/items/${id}`);
   const hist = useSWRInfinite<{ items: Movement[]; nextCursor: number | null }>(
     (i, prev) => (i > 0 && !prev?.nextCursor ? null : `/api/movements?variantId=${id}&limit=20${i > 0 ? `&cursor=${prev!.nextCursor}` : ""}`),
@@ -24,6 +30,8 @@ export function ItemDetail({ id }: { id: string }) {
   const [sheet, setSheet] = useState<MoveType | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [svg, setSvg] = useState<string | null>(null);
   const item = data?.item;
 
@@ -41,6 +49,21 @@ export function ItemDetail({ id }: { id: string }) {
     setBusy(true);
     try { await move({ item, ...s }); toast("success", t.movementSaved); setSheet(null); hist.mutate(); }
     catch (e) { toast("error", errorText(t, e)); } finally { setBusy(false); }
+  };
+  const archive = async () => {
+    if (!item || archiving) return;
+    setArchiving(true);
+    try {
+      await api(`/api/items/${id}`, { method: "DELETE", body: {} });
+      void mutateGlobal((k) => typeof k === "string" && (k.startsWith("/api/items") || k.startsWith("/api/dashboard")));
+      toast("success", lang === "ar" ? "تمت أرشفة المنتج وإخفاؤه من المخزون" : "Item archived and hidden from inventory");
+      router.replace("/items");
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      toast("error", code === "NONZERO_STOCK"
+        ? (lang === "ar" ? "لا يمكن الأرشفة قبل تصفير الكمية عن طريق جرد المخزون" : "Set stock to zero using an inventory adjustment first")
+        : errorText(t, e));
+    } finally { setArchiving(false); }
   };
   const Back = lang === "ar" ? ChevronRight : ChevronLeft;
   const movements = hist.data?.flatMap((p) => p.items) ?? [];
@@ -77,6 +100,7 @@ export function ItemDetail({ id }: { id: string }) {
             <div className="flex gap-2 whitespace-nowrap">
               <Link href={`/items/new?product=${item.productId}&name=${encodeURIComponent(item.name)}`} className="btn-ghost h-9 text-sm"><Plus className="size-4" />{t.addVariant}</Link>
               <button className="btn-ghost h-9 text-sm" onClick={() => setEditing((e) => !e)} data-testid="edit-btn"><Pencil className="size-4" />{t.editProduct}</button>
+              {user.role === "admin" && <button type="button" className="btn-ghost h-9 text-sm text-danger" onClick={() => setArchiveOpen(true)} data-testid="archive-item"><Archive className="size-4" />{lang === "ar" ? "أرشفة المنتج" : "Archive item"}</button>}
             </div>
           </div>
           {editing ? <EditForm item={item} onSaved={(it) => { mutate({ item: it }, { revalidate: false }); setEditing(false); }} /> : (
@@ -114,6 +138,23 @@ export function ItemDetail({ id }: { id: string }) {
       </section>
 
       {sheet && <StockSheet item={item} initialType={sheet} busy={busy} onClose={() => setSheet(null)} onSubmit={submit} />}
+      {archiveOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !archiving && setArchiveOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="archive-title" className="card w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-2">
+              <h2 id="archive-title" className="text-lg font-bold">{lang === "ar" ? "تأكيد أرشفة المنتج" : "Confirm item archive"}</h2>
+              <button type="button" disabled={archiving} onClick={() => setArchiveOpen(false)} aria-label={t.close}><X className="size-5" /></button>
+            </div>
+            <p className="mt-3 text-sm text-muted">{lang === "ar" ? "سيختفي المنتج من القائمة والمسح، لكن سجله وحركاته القديمة ستبقى محفوظة. لا يمكن أرشفته إلا إذا كانت الكمية صفرًا." : "This item will disappear from inventory and scanning, while preserving its movement history. Stock must be zero."}</p>
+            <p className="my-3 font-mono text-sm" dir="ltr">{item.sku} · {fmt(item.quantity)}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button className="btn-ghost" disabled={archiving} onClick={() => setArchiveOpen(false)}>{lang === "ar" ? "تراجع" : "Back"}</button>
+              <button className="btn bg-danger text-white" disabled={archiving || item.quantity !== 0} onClick={() => { void archive(); }} data-testid="confirm-archive">{archiving ? <Spinner /> : <Archive className="size-4" />}{lang === "ar" ? "تأكيد الأرشفة" : "Archive"}</button>
+            </div>
+            {item.quantity !== 0 && <p className="mt-3 text-sm text-danger">{lang === "ar" ? "صفّر رصيد المنتج أولًا عن طريق تعديل الجرد مع كتابة السبب." : "Adjust stock to zero with a reason first."}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
