@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { X, Flashlight, Keyboard, ImageUp, SwitchCamera, Zap, ZoomIn, PackagePlus, RotateCcw } from "lucide-react";
+import { X, Flashlight, Keyboard, ImageUp, SwitchCamera, ZoomIn, PackagePlus, RotateCcw } from "lucide-react";
 import { useI18n } from "./I18n";
 import { useToast } from "./Toast";
 import { StockSheet, type SheetSubmit } from "./StockSheet";
@@ -15,7 +15,7 @@ import type { Scanner, CamErrorKind, ScanResult } from "@/scanner/engine";
 type Mode = "in" | "out";
 type Status = "starting" | "scanning" | "error";
 
-const LS = { mode: "trn.scan.mode", fast: "trn.scan.fast", beep: "trn.scan.beep", cam: "trn.scan.cam" };
+const LS = { mode: "trn.scan.mode", beep: "trn.scan.beep", cam: "trn.scan.cam" };
 const ls = {
   get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} },
@@ -33,7 +33,6 @@ export function ScanView({ initialMode }: { initialMode?: Mode }) {
   const [status, setStatus] = useState<Status>("starting");
   const [camErr, setCamErr] = useState<CamErrorKind | null>(null);
   const [mode, setMode] = useState<Mode>(initialMode ?? "in");
-  const [fast, setFast] = useState(false);
   const [beep, setBeep] = useState(true);
   const [torchOn, setTorchOn] = useState(false);
   const [caps, setCaps] = useState({ torch: false, zoom: false, multiCam: false });
@@ -51,12 +50,11 @@ export function ScanView({ initialMode }: { initialMode?: Mode }) {
   const { data: list, mutate: refreshList } = useSWR<{ items: Item[] }>("/api/items", { revalidateOnMount: true });
   const listRef = useRef(list);
   listRef.current = list;
-  const state = useRef({ mode, fast, beep });
-  state.current = { mode, fast, beep };
+  const state = useRef({ beep });
+  state.current = { beep };
 
   useEffect(() => {
     if (!initialMode) { const m = ls.get(LS.mode); if (m === "in" || m === "out") setMode(m); }
-    setFast(ls.get(LS.fast) === "1");
     setBeep(ls.get(LS.beep) !== "0");
   }, [initialMode]);
 
@@ -93,15 +91,8 @@ export function ScanView({ initialMode }: { initialMode?: Mode }) {
     let it: Item | null;
     try { it = await findItem(code); } catch (e) { toast("error", errorText(t, e)); resume(); return; }
     if (!it) { setUnknown(code); return; }
-    if (state.current.fast) {
-      // Instant mode: one unit per scan, no confirmation; keep scanning immediately.
-      const target = it;
-      resume();
-      record(target, { type: state.current.mode, quantity: 1 }).catch((e) => toast("error", `${itemTitle(target, lang)}: ${errorText(t, e)}`, 4000));
-      return;
-    }
     setItem(it);
-  }, [findItem, record, resume, toast, t, lang]);
+  }, [findItem, resume, toast, t]);
 
   const onDetect = useCallback((r: ScanResult) => {
     engineRef.current?.feedback(state.current.beep);
@@ -154,7 +145,6 @@ export function ScanView({ initialMode }: { initialMode?: Mode }) {
   }, []);
 
   const setModeP = (m: Mode) => { setMode(m); ls.set(LS.mode, m); };
-  const toggleFast = () => { setFast((f) => { ls.set(LS.fast, f ? "0" : "1"); return !f; }); };
   const toggleTorch = async () => { const on = !torchOn; setTorchOn(on); await scannerRef.current?.setTorch(on); };
   const toggleZoom = async () => {
     const z = !zoomed; setZoomed(z);
@@ -259,7 +249,7 @@ export function ScanView({ initialMode }: { initialMode?: Mode }) {
             <span className="num shrink-0 font-bold" dir="ltr">{last.sign} → {fmt(last.qty)}</span>
           </div>
         )}
-        <div className="mx-auto grid max-w-md grid-cols-3 gap-2">
+        <div className="mx-auto grid max-w-md grid-cols-2 gap-2">
           <button onClick={() => { pause(); setManual(true); }} className="flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl bg-black/55 text-xs font-semibold backdrop-blur" data-testid="manual-btn">
             <Keyboard className="size-5" />{t.manualEntry}
           </button>
@@ -267,10 +257,6 @@ export function ScanView({ initialMode }: { initialMode?: Mode }) {
             <ImageUp className="size-5" />{t.scanImage}
             <input type="file" accept="image/*" className="sr-only" data-testid="image-input" onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = ""; }} />
           </label>
-          <button onClick={toggleFast} aria-pressed={fast} title={t.fastModeHint} data-testid="fast-btn"
-            className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-xs font-semibold backdrop-blur ${fast ? "bg-scan text-black" : "bg-black/55"}`}>
-            <Zap className="size-5" />{t.fastMode}
-          </button>
         </div>
       </div>
 
