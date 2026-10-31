@@ -20,7 +20,7 @@ export function Dashboard() {
   const user = useUser();
   const router = useRouter();
   const [q, setQ] = useState("");
-  const { data, error } = useSWR<D>("/api/dashboard", { refreshInterval: 20_000 });
+  const { data, error } = useSWR<D>("/api/dashboard", { refreshInterval: 60_000, revalidateOnFocus: false });
   const s = data?.stats;
 
   const stats = [
