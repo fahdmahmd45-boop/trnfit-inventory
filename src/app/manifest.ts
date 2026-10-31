@@ -14,7 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "ar",
     dir: "rtl",
     icons: [
-      { src: "/icons/trn-app-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
+      { src: "/icons/trn-app-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
     ],
     shortcuts: [
       { name: "مسح باركود", short_name: "Scan", url: "/scan", icons: [{ src: "/icons/trn-app-icon.svg", sizes: "any", type: "image/svg+xml" }] },
