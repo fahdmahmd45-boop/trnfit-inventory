@@ -1,0 +1,12 @@
+node_modules
+.next
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+test-results
+playwright-report
+tests/e2e/fixtures/*.y4m
+public/zxing/*.wasm
+tests/e2e/.auth.json
+tests/e2e/fixtures/*.png
