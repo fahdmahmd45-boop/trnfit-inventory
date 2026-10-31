@@ -1,0 +1,31 @@
+name: Import uploaded project archive
+on:
+  push:
+    paths:
+      - 'trnfit-inventory.zip'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Extract and verify project source
+        run: |
+          test -f trnfit-inventory.zip
+          unzip -Z1 trnfit-inventory.zip | grep -q '^src/app/layout.tsx$'
+          unzip -Z1 trnfit-inventory.zip | grep -q '^src/scanner/engine.ts$'
+          unzip -Z1 trnfit-inventory.zip | grep -q '^src/db/schema.ts$'
+          unzip -o -q trnfit-inventory.zip -d .
+          rm trnfit-inventory.zip
+          test -f src/app/layout.tsx
+          test -f scripts/seed.ts
+      - name: Commit imported project
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet || (git commit -m 'Import complete TRN FIT application source' && git push)
