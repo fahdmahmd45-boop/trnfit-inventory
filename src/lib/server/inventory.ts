@@ -39,6 +39,14 @@ export async function listItems(q?: string, filter: ItemFilter = "all"): Promise
   return rows.map(toItem);
 }
 
+/** Single indexed stock-alert query instead of two separate catalogue scans. */
+export async function inventoryAlerts(limit = 20): Promise<Item[]> {
+  const rows = await db.select(itemFields).from(v).innerJoin(p, eq(p.id, v.productId))
+    .where(and(eq(v.archived, false), eq(p.archived, false), sql`${v.quantity} <= ${v.lowStockThreshold}`))
+    .orderBy(v.quantity, p.name).limit(limit);
+  return rows.map(toItem);
+}
+
 export async function getItem(id: string): Promise<Item | null> {
   const [r] = await db.select(itemFields).from(v).innerJoin(p, eq(p.id, v.productId)).where(eq(v.id, id)).limit(1);
   return r ? toItem(r) : null;
