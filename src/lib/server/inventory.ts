@@ -192,6 +192,20 @@ export async function cancelMovement(id: number, employeeId: string, ip?: string
   return { ...result, item: await getItem(result.variantId) };
 }
 
+/** Archive an empty SKU without removing historical movements or audit data. */
+export async function archiveVariant(id: string, employeeId: string, ip?: string) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select({ id: v.id, sku: v.sku, quantity: v.quantity, archived: v.archived, productId: v.productId })
+      .from(v).where(eq(v.id, id)).for("update");
+    if (!row) throw new ApiError(404, "NOT_FOUND");
+    if (row.archived) throw new ApiError(409, "ALREADY_ARCHIVED");
+    if (row.quantity !== 0) throw new ApiError(409, "NONZERO_STOCK", { available: row.quantity });
+    await tx.update(v).set({ archived: true, updatedAt: new Date() }).where(eq(v.id, id));
+    await audit(tx, employeeId, "variant_archive", "variant", id, { sku: row.sku }, ip);
+    return { ok: true, sku: row.sku };
+  });
+}
+
 /** Generates a unique SKU like TRN-WWRAP-BLK, appending -2, -3… on collision. */
 export async function generateSku(name: string, variant: string, exclude: string[] = []): Promise<string> {
   const base = suggestSkuBase(name, variant);
