@@ -75,6 +75,8 @@ const movementFields = {
   id: m.id, variantId: m.variantId, sku: m.sku, type: m.type, quantity: m.quantity,
   quantityBefore: m.quantityBefore, quantityAfter: m.quantityAfter, note: m.note, reason: m.reason,
   employeeName: e.name, productName: p.name, variantName: v.variantName, createdAt: m.createdAt,
+  cancelled: sql<boolean>`exists (select 1 from audit_logs a where a.entity_type = 'movement' and a.entity_id = ${m.id}::text and a.action = 'movement_cancel')`,
+  isReversal: sql<boolean>`${m.note} like 'Reversal of movement #%'`,
 };
 type MRow = Omit<Movement, "createdAt"> & { createdAt: Date };
 const toMovement = (r: MRow): Movement => ({ ...r, createdAt: r.createdAt.toISOString() });
@@ -151,6 +153,43 @@ export async function applyMovement(input: MovementInput, employeeId: string, ip
     }
     throw err;
   }
+}
+
+/** Safely void an incorrect movement without erasing inventory history.
+ * Lock the original movement and its SKU, apply the inverse delta, and append
+ * a compensating movement + audit record in one database transaction.
+ */
+export async function cancelMovement(id: number, employeeId: string, ip?: string) {
+  const result = await db.transaction(async (tx) => {
+    const originalResult = await tx.execute<{ id: number; variant_id: string; sku: string; quantity: number; note: string | null }>(
+      sql`select id, variant_id, sku, quantity, note from stock_movements where id = ${id} for update`);
+    const original = originalResult.rows[0];
+    if (!original) throw new ApiError(404, "NOT_FOUND");
+    if (original.note?.startsWith("Reversal of movement #")) throw new ApiError(409, "CANNOT_CANCEL_REVERSAL");
+    const already = await tx.select({ id: schema.auditLogs.id }).from(schema.auditLogs)
+      .where(and(eq(schema.auditLogs.entityType, "movement"), eq(schema.auditLogs.entityId, String(id)), eq(schema.auditLogs.action, "movement_cancel"))).limit(1);
+    if (already.length) throw new ApiError(409, "ALREADY_CANCELLED");
+    const locked = await tx.execute<{ id: string; quantity: number; sku: string }>(
+      sql`select id, quantity, sku from product_variants where id = ${original.variant_id} for update`);
+    const variant = locked.rows[0];
+    if (!variant) throw new ApiError(404, "NOT_FOUND");
+    const inverse = -original.quantity;
+    const after = variant.quantity + inverse;
+    if (after < 0) throw new ApiError(409, "INSUFFICIENT_STOCK", { available: variant.quantity });
+    await tx.update(v).set({ quantity: after, updatedAt: new Date() }).where(eq(v.id, variant.id));
+    const [reversal] = await tx.insert(m).values({
+      variantId: variant.id, sku: variant.sku,
+      type: inverse > 0 ? "in" : inverse < 0 ? "out" : "adjust",
+      quantity: inverse, quantityBefore: variant.quantity, quantityAfter: after,
+      employeeId, note: `Reversal of movement #${id}`,
+      reason: inverse === 0 ? "Cancel movement" : null,
+      requestId: crypto.randomUUID(),
+    }).returning({ id: m.id });
+    await audit(tx, employeeId, "movement_cancel", "movement", String(id),
+      { reversalMovementId: reversal.id, sku: variant.sku, inverse, before: variant.quantity, after }, ip);
+    return { reversalMovementId: reversal.id, variantId: variant.id };
+  });
+  return { ...result, item: await getItem(result.variantId) };
 }
 
 /** Generates a unique SKU like TRN-WWRAP-BLK, appending -2, -3… on collision. */
