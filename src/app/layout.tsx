@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: "TRN FIT inventory & barcode management",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "TRN FIT", statusBarStyle: "black-translucent" },
-  icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
+  icons: { icon: [{ url: "/icons/trn-app-icon.svg", type: "image/svg+xml" }], shortcut: "/icons/trn-app-icon.svg", apple: "/icons/trn-app-icon.svg" },
   robots: { index: false, follow: false },
 };
 
