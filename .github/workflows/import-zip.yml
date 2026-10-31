@@ -1,0 +1,54 @@
+name: Import TRN FIT project ZIP
+on:
+  push:
+    paths:
+      - 'trnfit-inventory.zip'
+      - '.github/workflows/import-zip.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Extract project source safely
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import shutil
+          archive = Path("trnfit-inventory.zip")
+          if not archive.exists():
+              raise SystemExit("ZIP not found")
+          base = Path.cwd().resolve()
+          count = 0
+          with ZipFile(archive) as z:
+              for entry in z.infolist():
+                  name = entry.filename.replace("\\", "/").lstrip("/")
+                  if not name or entry.is_dir():
+                      continue
+                  target = (base / name).resolve()
+                  if not target.is_relative_to(base) or name.startswith(".git/") or name == "trnfit-inventory.zip":
+                      raise SystemExit(f"Unsafe ZIP entry: {name}")
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  with z.open(entry) as source, target.open("wb") as dest:
+                      shutil.copyfileobj(source, dest)
+                  count += 1
+          print(f"Extracted {count} project files")
+          archive.unlink()
+          PY
+      - name: Commit imported files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No source changes"
+          else
+            git commit -m "Import complete TRN FIT inventory source"
+            git push
+          fi
