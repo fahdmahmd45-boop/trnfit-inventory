@@ -14,6 +14,8 @@ export function MovementRow({ m, showItem = true }: { m: Movement; showItem?: bo
       <div className="min-w-0 flex-1">
         <div className="truncate text-[15px] font-semibold">
           {showItem ? `${m.productName}${m.variantName ? " — " + m.variantName : ""}` : label}
+          {m.cancelled && <span className="ms-2 rounded-lg bg-danger/15 px-2 py-0.5 text-xs font-semibold text-danger">{t.navMovements === "Movements" ? "Cancelled" : "ملغاة"}</span>}
+          {m.isReversal && <span className="ms-2 rounded-lg bg-olive/20 px-2 py-0.5 text-xs font-semibold text-olive-light">{t.navMovements === "Movements" ? "Correction" : "تصحيح"}</span>}
         </div>
         <div className="truncate text-xs text-muted">
           {showItem && <span className="me-1">{label} ·</span>}
