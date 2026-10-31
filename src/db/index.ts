@@ -9,7 +9,9 @@ declare global {
 }
 
 export function createPool(url = process.env.DATABASE_URL) {
-  if (!url) throw new Error("DATABASE_URL is not set");
+  // Defer database connectivity checks until a query runs. This lets Next.js
+  // compile server routes without a database during the build phase.
+  // Production queries still require a configured DATABASE_URL.
   const needsSsl = process.env.DATABASE_SSL === "require";
   return new Pool({
     connectionString: url,
